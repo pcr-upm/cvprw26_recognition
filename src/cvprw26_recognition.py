@@ -89,13 +89,28 @@ class CVPRW26Recognition(Recognition):
             self.model.eval()
 
     def process(self, ann, pred):
-        for img_pred in pred.images:
-            # Load image
-            image, _ = load_geoimage(img_pred.filename, self.depth, self.channels)
-            for obj_pred in img_pred.objects:
-                warped_image = self.preprocess(image, obj_pred.bb)
-                # Generate prediction
-                warped_image = np.expand_dims(warped_image, 0)
-                predictions = self.model.predict(warped_image, verbose=0)
-                # Save prediction
-                obj_pred.add_category(GenericCategory(self.classes[np.argmax(predictions)], np.max(predictions)))
+        from PIL import Image
+        from torchvision import transforms
+        from torchvision.transforms import InterpolationMode
+        transform = transforms.Compose([
+                transforms.Resize((100, 100), interpolation=InterpolationMode.BILINEAR),
+                transforms.CenterCrop(96),
+                transforms.ToTensor(),
+                transforms.Normalize((0.5,) * 3, (0.5,) * 3),
+        ])
+        with torch.no_grad():
+            for img_pred in pred.images:
+                # Load image
+                image, _ = load_geoimage(img_pred.filename, self.depth, self.channels)
+                for obj_pred in img_pred.objects:
+                    image_tensor = transform(Image.fromarray(image))
+                    # Add batch dimension if needed
+                    if image_tensor.ndim == 3:
+                        image_tensor = image_tensor.unsqueeze(0)
+                    image_tensor = image_tensor.to(self.device)
+                    # Generate prediction
+                    logits = self.model(image_tensor)
+                    idx = logits.argmax(dim=1).item()
+                    score = torch.softmax(logits, dim=1)[0, idx].item()
+                    # Save prediction
+                    obj_pred.add_category(GenericCategory(self.classes[idx], score))
