@@ -6,9 +6,10 @@ __email__ = 'roberto.valle@upm.es'
 import os
 import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')))
+import torch
 import numpy as np
 from images_framework.src.annotations import GenericCategory
-from images_framework.src.utils import load_geoimage
+from images_framework.src.utils import load_geoimage, DepthMode, ChannelsMode
 from images_framework.src.recognition import Recognition
 os.environ['PYTHONHASHSEED'] = '0'
 np.random.seed(42)
@@ -46,22 +47,46 @@ class CVPRW26Recognition(Recognition):
                             help='Number of epochs with no improvement after which training will be stopped.')
         args, unknown = parser.parse_known_args(params)
         print(parser.format_usage())
-        self.gpu = args.gpu
+        mode_gpu = torch.cuda.is_available() and -1 not in args.gpu
+        self.gpus = args.gpu
+        self.device = torch.device('cuda' if mode_gpu else 'cpu')
         self.batch_size = args.batch_size
         self.epoch = args.epoch
         self.patience = args.patience
+        if self.database == 'fer2013':
+            from images_framework.categories.emotions import Emotion as Oe
+            self.classes = {0: Oe.FACE.ANGER, 1: Oe.FACE.DISGUST, 2: Oe.FACE.FEAR, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.NEUTRAL, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE}
+            self.depth = DepthMode.UBYTE
+            self.channels = ChannelsMode.THREE
+        elif self.database == 'raf':
+            from images_framework.categories.emotions import Emotion as Oe
+            self.classes = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
+            self.depth = DepthMode.UBYTE
+            self.channels = ChannelsMode.THREE
+        elif self.database == 'affectnet':
+            from images_framework.categories.emotions import Emotion as Oe
+            self.classes = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
+            self.depth = DepthMode.UBYTE
+            self.channels = ChannelsMode.THREE
 
     def train(self, anns_train, anns_valid):
         print('Training model')
 
     def load(self, mode):
+        import torchinfo
         from images_framework.src.constants import Modes
+        from images_framework.classification.cvprw26_recognition.src.models_fer import FERBaselineNet
+        from images_framework.classification.cvprw26_recognition.src.checkpoint_loader import load_submodel_state_dict
         # Set up a neural network to train
         print('Load model')
+        self.model = FERBaselineNet(num_expr=len(self.classes), pretrained_backbone=False)
+        torchinfo.summary(self.model, input_size=(self.batch_size, 3, self.width, self.height), depth=5, device=self.device.type, col_names=['input_size', 'output_size', 'num_params', 'kernel_size'])
         if mode is Modes.TEST:
-            sv_path = self.path + 'data/' + self.database + '/'
-        print('CPU mode' if -1 in self.gpu else 'GPU mode with devices ' + str(self.gpu))
-        os.environ["CUDA_VISIBLE_DEVICES"] = str(self.gpu[0])
+            model_path = self.path + 'data/' + self.database + '/'
+            print('Loading model from {}'.format(model_path))
+            self.model.load_state_dict(load_submodel_state_dict(str(model_path+'last.ckpt'), 'model'), strict=True)            
+            self.model.to(self.device)
+            self.model.eval()
 
     def process(self, ann, pred):
         for img_pred in pred.images:
