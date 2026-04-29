@@ -13,7 +13,6 @@ import importlib.util
 from tqdm import tqdm
 from pathlib import Path
 from images_framework.src.constants import Modes
-from images_framework.src.datasets import Database
 from images_framework.src.composite import Composite
 from images_framework.src.viewer import Viewer
 from src.cvprw26_recognition import CVPRW26Recognition
@@ -48,32 +47,40 @@ def load_annotations(anns_file):
     """
     Load ground truth annotations according to each database.
     """
+    from PIL import Image
+    from scipy.spatial.transform import Rotation
+    from images_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
+    from images_framework.src.categories import Name
+    from images_framework.categories.emotions import Emotion as Oe
+    from src.raf_db import parse_rafdb
     print('Open annotations file: ' + str(anns_file))
     if os.path.isfile(anns_file):
-        pos = anns_file.rfind('/') + 1
-        path = anns_file[:pos]
-        file = anns_file[pos:]
-        db = file[:file.find('_ann')]
-        datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
-        with open(anns_file, 'r', encoding='utf-8') as ifs:
-            lines = ifs.readlines()
-            anns = []
-            for i in tqdm(range(len(lines)), file=sys.stdout):
-                parts = lines[i].strip().split(';')
-                if parts[0] == '@':
-                    db = parts[1]
-                if parts[0] == '#' or parts[0] == '@':
-                    continue
-                idx = next((idx for idx, subset in enumerate(datasets) if db in subset), None)
-                if idx is None:
-                    raise ValueError('Database does not exist')
-                seq = Database.__subclasses__()[idx]().load_filename(path, db, lines[i])
-                if len(seq.images) == 0:
-                    continue
-                anns.append(seq)
-        ifs.close()
+        if anns_file == 'csv/rafdb_test_pose_bboxq_illum.csv':
+            dbpath = '/home/database/classification/faces/expressions/raf/basic/'
+            gender = {0: Name('Male'), 1: Name('Female')}
+            race = {0: Name('Caucasian'), 1: Name('African-American'), 2: Name('Asian')}
+            age = {0: Name('0-3'), 1: Name('4-19'), 2: Name('20-39'), 3: Name('40-69'), 4: Name('70+')}
+            category = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
+            samples = parse_rafdb(Path(anns_file))
     else:
         raise ValueError('Annotations file does not exist')
+    anns = []
+    for sample in tqdm(samples, file=sys.stdout):
+        seq = GenericGroup()
+        image = GenericImage(dbpath + sample['path'])
+        width, height = Image.open(image.filename).size
+        image.tile = np.array([0, 0, width, height])
+        obj = PersonObject()
+        obj.headpose = Rotation.from_euler('YXZ', [float(sample['yaw']), float(sample['pitch']), float(sample['roll'])], degrees=True).as_matrix()
+        obj.add_attribute(GenericCategory(label=gender[int(sample['gender'])]))
+        obj.add_attribute(GenericCategory(label=race[int(sample['race'])]))
+        obj.add_attribute(GenericCategory(label=age[int(sample['age'])]))
+        obj.add_attribute(GenericCategory(label=Name('bbox_h'), score=float(sample['bbox_h'])))
+        obj.add_attribute(GenericCategory(label=Name('illumination'), score=float(sample['illumination'])))
+        obj.add_category(GenericCategory(category[int(sample['expression'])]))
+        image.add_object(obj)
+        seq.add_image(image)
+        anns.append(seq)
     return anns
 
 
