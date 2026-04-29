@@ -9,13 +9,12 @@ sys.path.append(os.getcwd())
 import cv2
 import json
 import copy
-import argparse
 import numpy as np
 import importlib.util
 from pathlib import Path
 from images_framework.src.constants import Modes
+from images_framework.src.datasets import Database
 from images_framework.src.composite import Composite
-from images_framework.src.categories import Category as Oi
 from images_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericLandmark, GenericCategory
 from images_framework.src.viewer import Viewer
 from images_framework.src.utils import load_geoimage
@@ -30,6 +29,7 @@ def parse_options():
     """
     Parse options from command line.
     """
+    import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument('--input-data', '-d', dest='input_data', required=False, default='',
                         help='Input as image, directory, camera or video file.')
@@ -49,7 +49,6 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
     """
     Process frame and show results.
     """
-    from images_framework.src.datasets import Database
     datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
     # Read annotations
     ann, pred = GenericGroup(), GenericGroup()
