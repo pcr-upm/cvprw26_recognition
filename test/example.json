@@ -8,10 +8,17 @@
       "date_captured": ""
     }
   ],
+  "database": "raf",
   "annotations": [
     {
       "id": "0008",
       "image_id": 0,
+      "bbox": {
+        "pt1_x": 109.995773,
+        "pt1_y": 121.239365,
+        "pt2_x": 251.488815,
+        "pt2_y": 308.514191
+      },
       "landmarks": [
         {
           "label": 101,
@@ -46,19 +53,11 @@
       ],
       "iscrowd": 0,
       "attributes": {
-        "gender": "male",
-        "race": "caucasian",
-        "age_range": "20-39"
+        "gender": "0",
+        "race": "0",
+        "age": "2",
+        "emotion": "1"
       }
-    }
-  ],
-  "mapping": [
-    {
-      "leye_center": [101],
-      "reye_center": [102],
-      "nose_tip": [17],
-      "mouth_left": [20],
-      "mouth_right": [21]
     }
   ]
 }

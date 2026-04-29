@@ -3,7 +3,7 @@ echo 'Using Docker to start the container and run tests ...'
 sudo docker build --force-rm --build-arg SSH_PRIVATE_KEY="$(cat ~/.ssh/id_rsa)" -t cvprw26_recognition_image .
 sudo docker volume create --name cvprw26_recognition_volume
 sudo docker run --name cvprw26_recognition_container -v cvprw26_recognition_volume:/home/username --rm --gpus all -it -d cvprw26_recognition_image bash
-sudo docker exec -w /home/username/cvprw26_recognition cvprw26_recognition_container python test/cvprw26_recognition_test.py --input-data test/example.tif --database affwild2 --gpu 0 --save-image
+sudo docker exec -w /home/username/cvprw26_recognition cvprw26_recognition_container python test/cvprw26_recognition_test.py --input-data test/example.jpg --database affectnet --gpu 0 --save-image
 sudo docker stop cvprw26_recognition_container
 echo 'Transferring data from docker container to your local machine ...'
 mkdir -p output

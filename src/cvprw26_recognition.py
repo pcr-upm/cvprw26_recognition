@@ -75,8 +75,8 @@ class CVPRW26Recognition(Recognition):
     def load(self, mode):
         import torchinfo
         from images_framework.src.constants import Modes
-        from images_framework.classification.cvprw26_recognition.src.models_fer import FERBaselineNet
-        from images_framework.classification.cvprw26_recognition.src.checkpoint_loader import load_submodel_state_dict
+        from src.models_fer import FERBaselineNet
+        from src.checkpoint_loader import load_submodel_state_dict
         # Set up a neural network to train
         print('Load model')
         self.model = FERBaselineNet(num_expr=len(self.classes), pretrained_backbone=False)

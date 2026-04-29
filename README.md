@@ -11,6 +11,10 @@ IEEE Conference on Computer Vision and Pattern Recognition Workshops, CVPRW 2026
 #### Requisites
 - images-framework
 - tqdm
+- matplotlib
+- pandas
+- pytorch
+- torchinfo
 
 #### Usage
 ```
@@ -33,5 +37,5 @@ usage: CVPRW26Recognition [--gpu GPU] [--batch-size BATCH_SIZE] [--epochs EPOCHS
 
 * Use the --gpu option to set the GPU identifier (negative value indicates CPU mode).
 ```
-> python test/cvprw26_recognition_test.py --input-data test/example.tif --database affwild2 --gpu 0 --save-image
+> python test/cvprw26_recognition_test.py --input-data test/example.jpg --database affectnet --gpu 0 --save-image
 ```

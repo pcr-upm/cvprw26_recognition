@@ -49,6 +49,8 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
     """
     Process frame and show results.
     """
+    from images_framework.src.datasets import Database
+    datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
     # Read annotations
     ann, pred = GenericGroup(), GenericGroup()
     img_ann = GenericImage(filename)
@@ -57,15 +59,26 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
     pred.add_image(copy.deepcopy(img_ann))
     ifs = os.path.splitext(filename)[0]+'.json'
     if os.path.exists(ifs):
-        mapping = json.load(open(ifs))['mapping'][0]
+        db = Database.__subclasses__()[next((idx for idx, subset in enumerate(datasets) if json.load(open(ifs))['database'] in subset), None)]()
+        landmarks = db.get_landmarks()
+        gender = db._gender
+        race = db._race
+        age = db._age
+        categories = db.get_categories()
         for line in json.load(open(ifs))['annotations']:
             obj = PersonObject()
-            obj.add_category(GenericCategory(label=Oi.FACE))
-            pred.images[-1].add_object(copy.deepcopy(obj))
+            bbox = line['bbox']
+            obj.bb = (float(bbox['pt1_x']), float(bbox['pt1_y']), float(bbox['pt2_x']), float(bbox['pt2_y']))
             for lnd in line['landmarks']:
-                name = list(mapping.keys())[next((ids for ids, xs in enumerate(mapping.values()) for x in xs if x == lnd['label']), None)]
+                name = list(landmarks.keys())[next((ids for ids, xs in enumerate(landmarks.values()) for x in xs if x == lnd['label']), None)].value 
                 lp = next((elem for part in lps.keys() for elem in part if elem.value == name), None)
                 obj.add_landmark(GenericLandmark(lnd['label'], lp, lnd['pos'], lnd['visible'], lnd['confidence']), lps[type(lp)])
+            attributes = line['attributes']
+            obj.add_attribute(GenericCategory(gender[int(attributes['gender'])]))
+            obj.add_attribute(GenericCategory(race[int(attributes['race'])]))
+            obj.add_attribute(GenericCategory(age[int(attributes['age'])]))
+            pred.images[-1].add_object(copy.deepcopy(obj))
+            obj.add_category(GenericCategory(categories[int(attributes['emotion'])]))
             img_ann.add_object(obj)
     else:
         from images_framework.detection.ssd16_detection.src.ssd16_detection import SSD16Detection
