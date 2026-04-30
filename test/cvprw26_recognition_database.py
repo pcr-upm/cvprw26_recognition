@@ -6,7 +6,6 @@ __email__ = 'roberto.valle@upm.es'
 import os
 import sys
 sys.path.append(os.getcwd())
-import cv2
 import copy
 import numpy as np
 import pandas as pd
@@ -28,21 +27,25 @@ def parse_options():
     parser = argparse.ArgumentParser()
     parser.add_argument('--anns-file', '-a', dest='anns_file', required=True,
                         help='Ground truth annotations file.')
-    parser.add_argument('--input-data', '-d', dest='input_data', required=False, default='',
-                        help='Input as image, directory, camera or video file.')
     parser.add_argument('--show-viewer', '-v', dest='show_viewer', action="store_true",
                         help='Show results visually.')
     parser.add_argument('--save-file', '-f', dest='save_file', action="store_true",
                         help='Save experiments in a text file.')
     parser.add_argument('--save-image', '-i', dest='save_image', action="store_true",
                         help='Save processed images.')
+    parser.add_argument('--demographic-factor', dest='demographic_factor', required=True, choices=['Gender', 'Race'],
+                        help='Demographic factor.')
+    parser.add_argument('--confounding-factor', dest='confounding_factor', required=True, choices=['Pose', 'Illumination'],
+                        help='Confounding factor.')
     args, unknown = parser.parse_known_args()
     print(parser.format_usage())
     anns_file = args.anns_file
     show_viewer = args.show_viewer
     save_file = args.save_file
     save_image = args.save_image
-    return unknown, anns_file, show_viewer, save_file, save_image
+    demo_factor = args.demographic_factor
+    conf_factor = args.confounding_factor
+    return unknown, anns_file, show_viewer, save_file, save_image, demo_factor, conf_factor
 
 
 def load_annotations(anns_file):
@@ -65,7 +68,7 @@ def load_annotations(anns_file):
         dbpath = '/home/database/classification/faces/expressions/affectnet/'
         gender = {0: Name('Female'), 1: Name('Male')}
         race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White'), 4: Name('Middle-Eastern'), 5: Name('Latino-Hispanic')}
-        category = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
+        categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
         samples = parse_affectnet(Path(anns_file))
     else:
         raise ValueError('Annotations file does not exist')
@@ -80,28 +83,29 @@ def load_annotations(anns_file):
         obj.add_attribute(GenericCategory(label=gender[int(sample['gender'])]))
         obj.add_attribute(GenericCategory(label=race[int(sample['race'])]))
         obj.add_attribute(GenericCategory(label=Name('illumination'), score=float(sample['illumination'])))
-        obj.add_category(GenericCategory(category[int(sample['expression'])]))
+        obj.add_category(GenericCategory(categories[int(sample['expression'])]))
         image.add_object(obj)
         seq.add_image(image)
         anns.append(seq)
-    return anns
+    return anns, [cat.name for cat in categories.values()]
 
 
-def expression_counts_by_gender_pose(df):
+def expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor):
     """
-    Create a table of expression counts by gender and pose bins.
+    Create a table of expression counts by demographic factor and confounding factor bins.
     """
-    df['YawBin'] = df['Yaw'].apply(lambda x: '0_15' if abs(x) <= 15 else '15_90')
-    df['IlluminationBin'] = df['Illumination'].apply(lambda x: '0_125' if x <= 125 else '125_255')
-    # table = pd.crosstab(index=df['EmotionGt'], columns=[df['Gender'], df['YawBin']], dropna=False)
-    # desired_columns = [('Female', '0_15'), ('Female', '15_90'), ('Male', '0_15'), ('Male', '15_90')]
-    table = pd.crosstab(index=df['EmotionGt'], columns=[df['Gender'], df['IlluminationBin']], dropna=False)
-    desired_columns = [('Female', '0_125'), ('Female', '125_255'), ('Male', '0_125'), ('Male', '125_255')]
-    table = table.reindex(columns=desired_columns, fill_value=0)
-    all_emotions = ['Neutral', 'Happiness', 'Sadness', 'Surprise', 'Fear', 'Disgust', 'Anger', 'Contempt']
-    table = table.reindex(all_emotions, fill_value=0)
-    table.columns = pd.MultiIndex.from_tuples(table.columns, names=['gender', 'pose'])
-    print(table)
+    # Create bins for confounding factor
+    if conf_factor == 'Pose':
+        df['ConfBin'] = np.where(np.abs(df['Yaw']) <= 15, '0_15', '15_90')
+    elif conf_factor == 'Illumination':
+        df['ConfBin'] = np.where(df['Illumination'] <= 125, '0_125', '125_255')
+    else:
+        raise ValueError(f"Unknown confounding factor: {conf_factor}")
+    df['EmotionGt'] = pd.Categorical(df['EmotionGt'], categories=categories, ordered=True)
+    df[demo_factor] = pd.Categorical(df[demo_factor], categories=sorted(df[demo_factor].unique()), ordered=True)
+    df['ConfBin'] = pd.Categorical(df['ConfBin'], categories=sorted(df['ConfBin'].unique()), ordered=True)
+    # Create crosstab
+    print(pd.crosstab(index=df['EmotionGt'], columns=[df[demo_factor], df['ConfBin']], dropna=False))
     return df
 
 
@@ -131,7 +135,7 @@ def illumination_conditioned_macro_tpr_table_from_confusions(df):
     rows = []
     for g in [0, 1]:
         for illum_bin in ['0_125', '125_255']:
-            mask = (gender == g) & (df['IlluminationBin'] == illum_bin)
+            mask = (gender == g) & (df['ConfBin'] == illum_bin)
             y_filtered = y[mask]
             pred_filtered = pred[mask]
             # Compute confusion matrix and TPRs
@@ -271,7 +275,7 @@ def illumination_standardized_gap_from_confusions(df):
     # Convert emotion names to indices
     y = df['EmotionGt'].map(emotion_map).values
     pred = df['EmotionPred'].map(emotion_map).values
-    illumination_bins = df['IlluminationBin'].values
+    illumination_bins = df['ConfBin'].values
     
     # Map illumination bins
     illum_map = {'0_125': 0, '125_255': 1}
@@ -321,18 +325,13 @@ def main():
     """
     Facial expression recognition database script.
     """
-    unknown, anns_file, show_viewer, save_file, save_image = parse_options()
-    anns = load_annotations(anns_file)
+    unknown, anns_file, show_viewer, save_file, save_image, demo_factor, conf_factor = parse_options()
+    anns, categories = load_annotations(anns_file)
     # Analyze annotation data
-    print("\n=== Expression counts inside each gender-pose bin ===")
-    records = []
-    for seq in anns:
-        for img in seq.images:
-            for obj in img.objects:
-                euler = Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)
-                records.append({'Yaw': euler[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].score})
-    df = pd.DataFrame(records)
-    df = expression_counts_by_gender_pose(df)
+    print("\n=== Expression counts within each demomographic-confounding factor bin ===")
+    records = [{'Yaw': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].score} for seq in anns for img in seq.images for obj in img.objects]
+    df = pd.DataFrame.from_records(records)
+    df = expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
     # Load computer vision components
     composite = Composite()
     sr = CVPRW26Recognition('')
@@ -355,12 +354,6 @@ def main():
         for img_pred in pred.images:
             for obj_pred in img_pred.objects:
                 obj_pred.clear()
-                if obj_pred.bb == (-1, -1, -1, -1):
-                    if all(np.array_equal(contour, np.array([[[-1, -1]], [[-1, -1]], [[-1, -1]]])) for contour in obj_pred.multipolygon):
-                        obj_pred.bb = cv2.boundingRect(np.array([pt for contour in obj_pred.multipolygon for pt in contour]))
-                        obj_pred.bb = (obj_pred.bb[0], obj_pred.bb[1], obj_pred.bb[0] + obj_pred.bb[2], obj_pred.bb[1] + obj_pred.bb[3])
-                    else:
-                        raise ValueError('Cannot perform alignment due to undefined object location')
         composite.process(anns[i], pred)
         preds.extend(obj_pred.categories[0].label.name for img_pred in pred.images for obj_pred in img_pred.objects)
         if show_viewer:
