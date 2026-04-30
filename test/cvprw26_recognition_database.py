@@ -62,7 +62,7 @@ def load_annotations(anns_file):
         dbpath = '/home/database/classification/faces/expressions/raf/basic/'
         gender = {0: Name('Male'), 1: Name('Female')}
         race = {0: Name('Caucasian'), 1: Name('African-American'), 2: Name('Asian')}
-        category = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
+        categories = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
         samples = parse_rafdb(Path(anns_file))
     elif os.path.isfile(anns_file) and anns_file == 'csv/affectnetplus_test_annotations_quality_illum.csv':
         dbpath = '/home/database/classification/faces/expressions/affectnet/'
@@ -109,23 +109,12 @@ def expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
     return df
 
 
-def illumination_conditioned_macro_tpr_table_from_confusions(df):
+def macro_tpr_table(df, categories):
     """
-    Compute macro-TPR by gender and illumination bin.
+    Compute macro-TPR by demographic and confounding factor bins.
     """
-    # Map emotion names to indices (AffectNet)
-    emotion_map = {
-        'Neutral': 0,
-        'Happiness': 1,
-        'Sadness': 2,
-        'Surprise': 3,
-        'Fear': 4,
-        'Disgust': 5,
-        'Anger': 6,
-        'Contempt': 7,
-    }
-    num_classes = 8
     # Convert emotion names to indices
+    emotion_map = {name: idx for idx, name in enumerate(categories)}
     y = df['EmotionGt'].map(emotion_map).values
     pred = df['EmotionPred'].map(emotion_map).values
     # Map gender names to indices
@@ -139,7 +128,7 @@ def illumination_conditioned_macro_tpr_table_from_confusions(df):
             y_filtered = y[mask]
             pred_filtered = pred[mask]
             # Compute confusion matrix and TPRs
-            cm = np.zeros((num_classes, num_classes), dtype=np.int64)
+            cm = np.zeros((len(categories), len(categories)), dtype=np.int64)
             if y_filtered.size == 0:
                 return cm
             np.add.at(cm, (y_filtered, pred_filtered), 1)
@@ -147,7 +136,7 @@ def illumination_conditioned_macro_tpr_table_from_confusions(df):
             tpr = np.full(cm.shape[0], np.nan, dtype=np.float64)
             valid = den > 0
             tpr[valid] = cm.diagonal()[valid] / den[valid]
-            macro_tpr = np.nanmean(tpr)
+            macro_tpr = np.nanmean(tpr)*100
             gender_name = 'Female' if g == 0 else 'Male'
             rows.append({
                 'gender': gender_name,
@@ -164,42 +153,6 @@ def illumination_conditioned_macro_tpr_table_from_confusions(df):
     gap_avg = np.mean(gap_per_bin)
     table['Gap (M-F)'] = gap_avg
     print(table.to_string(float_format=lambda x: f"{x:.4f}"))
-    return table
-
-
-def _macro_f1(df, gender_filter=None):
-    """
-    Compute macro-F1 score from dataframe.
-    """
-    emotion_map = {
-        'Neutral': 0,
-        'Happiness': 1,
-        'Sadness': 2,
-        'Surprise': 3,
-        'Fear': 4,
-        'Disgust': 5,
-        'Anger': 6,
-        'Contempt': 7,
-    }
-    num_classes = 8
-    # Filter by gender if specified
-    df_filtered = df
-    if gender_filter is not None:
-        df_filtered = df[df['Gender'] == gender_filter]
-    # Convert to indices
-    y = df_filtered['EmotionGt'].map(emotion_map).values
-    pred = df_filtered['EmotionPred'].map(emotion_map).values
-    # Calculate F1 per class
-    f1s = []
-    for c in range(num_classes):
-        tp = np.sum((pred == c) & (y == c))
-        fp = np.sum((pred == c) & (y != c))
-        fn = np.sum((pred != c) & (y == c))
-        den = 2 * tp + fp + fn
-        if den == 0:
-            continue
-        f1s.append((2 * tp) / den)
-    return float(np.mean(f1s)) if f1s else float("nan")
 
 
 def _confusion_matrix_expr(y, pred, num_classes):
@@ -224,29 +177,20 @@ def _macro_tpr_from_confusion(cm):
     valid = np.isfinite(tpr)
     if not np.any(valid):
         return float("nan")
-    return float(np.mean(tpr[valid]))
+    return float(np.mean(tpr[valid]))*100
 
-def observed_macro_tpr_by_gender_from_confusions(df):
-    """Compute observed macro-TPR by gender from dataframe."""
-    emotion_map = {
-        'Neutral': 0,
-        'Happiness': 1,
-        'Sadness': 2,
-        'Surprise': 3,
-        'Fear': 4,
-        'Disgust': 5,
-        'Anger': 6,
-        'Contempt': 7,
-    }
-    num_classes = 8
-    
+def fairness_gaps_table(df, categories):
+    """
+    Compute fairness gaps by demographic and confounding factor bins.
+    """
+    emotion_map = {name: idx for idx, name in enumerate(categories)}
     # Convert emotion names to indices
     y = df['EmotionGt'].map(emotion_map).values
     pred = df['EmotionPred'].map(emotion_map).values
     
     # Compute confusion matrices per gender
-    cm_f = _confusion_matrix_expr(y[df['Gender'] == 'Female'], pred[df['Gender'] == 'Female'], num_classes)
-    cm_m = _confusion_matrix_expr(y[df['Gender'] == 'Male'], pred[df['Gender'] == 'Male'], num_classes)
+    cm_f = _confusion_matrix_expr(y[df['Gender'] == 'Female'], pred[df['Gender'] == 'Female'], len(categories))
+    cm_m = _confusion_matrix_expr(y[df['Gender'] == 'Male'], pred[df['Gender'] == 'Male'], len(categories))
     
     m_f = _macro_tpr_from_confusion(cm_f)
     m_m = _macro_tpr_from_confusion(cm_m)
@@ -254,22 +198,8 @@ def observed_macro_tpr_by_gender_from_confusions(df):
     
     print(f"M_female: {m_f:.6f}")
     print(f"M_male:   {m_m:.6f}")
-    print(f"G_obs (M-F): {gap_obs:.6f}")
+    print(f"GAP: {gap_obs:.6f}")
 
-
-def illumination_standardized_gap_from_confusions(df):
-    """Compute illumination-standardized gap from dataframe."""
-    emotion_map = {
-        'Neutral': 0,
-        'Happiness': 1,
-        'Sadness': 2,
-        'Surprise': 3,
-        'Fear': 4,
-        'Disgust': 5,
-        'Anger': 6,
-        'Contempt': 7,
-    }
-    num_classes = 8
     MIN_PER_BIN = 20
     
     # Convert emotion names to indices
@@ -305,12 +235,12 @@ def illumination_standardized_gap_from_confusions(df):
     for iid in supported_idx:
         # Female
         mask_f = (df['Gender'] == 'Female') & (illumination_id == iid)
-        cm_f = _confusion_matrix_expr(y[mask_f], pred[mask_f], num_classes)
+        cm_f = _confusion_matrix_expr(y[mask_f], pred[mask_f], len(categories))
         m_gb[0, iid] = _macro_tpr_from_confusion(cm_f)
         
         # Male
         mask_m = (df['Gender'] == 'Male') & (illumination_id == iid)
-        cm_m = _confusion_matrix_expr(y[mask_m], pred[mask_m], num_classes)
+        cm_m = _confusion_matrix_expr(y[mask_m], pred[mask_m], len(categories))
         m_gb[1, iid] = _macro_tpr_from_confusion(cm_m)
     
     # Compute standardized gap
@@ -318,7 +248,8 @@ def illumination_standardized_gap_from_confusions(df):
     m_std_m = float(np.sum(w_ref[supported] * m_gb[1, supported]))
     gap_std = float(m_std_m - m_std_f)
     
-    print(f"G_std (M-F): {gap_std:.6f}")
+    print(f"GAPstd: {gap_std:.6f}")
+    print(f"∆: {gap_obs-gap_std:.6f}")
 
 
 def main():
@@ -373,16 +304,10 @@ def main():
         ofs.close()
     # Compute unbiased metrics
     df['EmotionPred'] = preds
-    print("\n=== Macro-TPR by gender and illumination from C^{g,b} ===")
-    illumination_conditioned_macro_tpr_table_from_confusions(df)
-    print("\n=== Macro-F1 ===")
-    print("f1_macro_all:", _macro_f1(df))
-    print("f1_macro_female:", _macro_f1(df, gender_filter='Female'))
-    print("f1_macro_male:", _macro_f1(df, gender_filter='Male'))
-    print("\n--- Observed from C^g ---")
-    observed_macro_tpr_by_gender_from_confusions(df)
-    print("\n--- Illumination-standardized from C^{g,b} ---")
-    illumination_standardized_gap_from_confusions(df)
+    print("\n=== Macro-TPR (%) per demographic factor using a visual confounder ===")
+    macro_tpr_table(df, categories)
+    print("\n=== Empirical and standardized fairness gaps (%) per demographic factor using a visual confounder ===")
+    fairness_gaps_table(df, categories)
 
 if __name__ == '__main__':
     main()
