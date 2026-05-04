@@ -117,58 +117,50 @@ def fairness_gaps_table(df, categories):
     """
     Compute macro-TPR by demographic and confounding factor bins.
     """
+    def _macro_tpr_from_confusion(y, pred, num_classes):
+        # Compute confusion matrix
+        cm = np.zeros((num_classes, num_classes), dtype=np.int64)
+        if y.size > 0:
+            np.add.at(cm, (y, pred), 1)
+        # Compute TPR per class
+        den = cm.sum(axis=1).astype(np.float64)
+        tpr = np.full(cm.shape[0], np.nan, dtype=np.float64)
+        valid = den > 0
+        tpr[valid] = cm.diagonal()[valid] / den[valid]
+        # Compute macro-TPR
+        valid_tpr = np.isfinite(tpr)
+        if not np.any(valid_tpr):
+            return float("nan")
+        return float(np.mean(tpr[valid_tpr])) * 100
+    
     emotion_map = {name: idx for idx, name in enumerate(categories)}
     anno = df['EmotionGt'].map(emotion_map).values
     pred = df['EmotionPred'].map(emotion_map).values
     # Create results table
     rows = []
     for d in df["DemoBin"].unique():
-        # Aggregate over ALL poses (ConfBin)
+        # Aggregate over ALL confounding factors
         mask = df["DemoBin"] == d
-        cm = _confusion_matrix_expr(anno[mask], pred[mask], len(categories))
-        score = _macro_tpr_from_confusion(cm)
+        score = _macro_tpr_from_confusion(anno[mask], pred[mask], len(categories))
         rows.append({"demo": d, "conf": "All", "macro_tpr": score})
-        # For each counfounding factor individually
+        # For each confounding factor individually
         for c in df["ConfBin"].unique():
             mask = (df["DemoBin"] == d) & (df["ConfBin"] == c)
-            cm = _confusion_matrix_expr(anno[mask], pred[mask], len(categories))
-            score = _macro_tpr_from_confusion(cm)
+            score = _macro_tpr_from_confusion(anno[mask], pred[mask], len(categories))
             rows.append({"demo": d, "conf": c, "macro_tpr": score})
     print("\n=== Macro-TPR (%) per demographic factor using a visual confounder ===")
-    df = pd.DataFrame(rows)
-    table = df.pivot(index="demo", columns="conf", values="macro_tpr").sort_index()
+    df_results = pd.DataFrame(rows)
+    table = df_results.pivot(index="demo", columns="conf", values="macro_tpr").sort_index()
     print(table.to_string(float_format=lambda x: f"{x:.2f}"))
     print("\n=== Empirical and standardized fairness gaps (%) ===")
-    gap = float(table.loc["Male", "All"] - table.loc["Female", "All"])
-    gap_std = float(np.mean(table.loc["Male", table.columns[:2]].to_numpy(dtype=np.float64) - table.loc["Female", table.columns[:2]].to_numpy(dtype=np.float64)))
+    M_g = table["All"]
+    conf_cols = table.columns.drop("All")
+    M_g_std = table[conf_cols].mean(axis=1)
+    gap = M_g.max() - M_g.min()
+    gap_std = M_g_std.max() - M_g_std.min()
     print(f"GAP: {gap:.6f}")
     print(f"GAPstd: {gap_std:.6f}")
     print(f"∆: {gap-gap_std:.6f}")
-
-
-def _confusion_matrix_expr(y, pred, num_classes):
-    """Compute confusion matrix."""
-    cm = np.zeros((num_classes, num_classes), dtype=np.int64)
-    if y.size == 0:
-        return cm
-    np.add.at(cm, (y, pred), 1)
-    return cm
-
-def _class_tpr_from_confusion(cm):
-    """Compute TPR per class from confusion matrix."""
-    den = cm.sum(axis=1).astype(np.float64)
-    tpr = np.full(cm.shape[0], np.nan, dtype=np.float64)
-    valid = den > 0
-    tpr[valid] = cm.diagonal()[valid] / den[valid]
-    return tpr
-
-def _macro_tpr_from_confusion(cm):
-    """Compute macro-TPR from confusion matrix."""
-    tpr = _class_tpr_from_confusion(cm)
-    valid = np.isfinite(tpr)
-    if not np.any(valid):
-        return float("nan")
-    return float(np.mean(tpr[valid]))*100
 
 
 def main():
