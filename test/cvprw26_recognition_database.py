@@ -95,64 +95,55 @@ def expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
     Create a table of expression counts by demographic factor and confounding factor bins.
     """
     # Create bins for confounding factor
+    if demo_factor == 'Gender' or demo_factor == 'Race':
+        df['DemoBin'] = df[demo_factor]
+    else:
+        raise ValueError(f"Unknown demographic factor: {demo_factor}")
     if conf_factor == 'Pose':
-        df['ConfBin'] = np.where(np.abs(df['Yaw']) <= 15, '0_15', '15_90')
+        df['ConfBin'] = np.where(np.abs(df[conf_factor]) <= 15, '0_15', '15_90')
     elif conf_factor == 'Illumination':
-        df['ConfBin'] = np.where(df['Illumination'] <= 125, '0_125', '125_255')
+        df['ConfBin'] = np.where(df[conf_factor] <= 125, '0_125', '125_255')
     else:
         raise ValueError(f"Unknown confounding factor: {conf_factor}")
     df['EmotionGt'] = pd.Categorical(df['EmotionGt'], categories=categories, ordered=True)
-    df[demo_factor] = pd.Categorical(df[demo_factor], categories=sorted(df[demo_factor].unique()), ordered=True)
+    df['DemoBin'] = pd.Categorical(df['DemoBin'], categories=sorted(df['DemoBin'].unique()), ordered=True)
     df['ConfBin'] = pd.Categorical(df['ConfBin'], categories=sorted(df['ConfBin'].unique()), ordered=True)
     # Create crosstab
-    print(pd.crosstab(index=df['EmotionGt'], columns=[df[demo_factor], df['ConfBin']], dropna=False))
+    print(pd.crosstab(index=df['EmotionGt'], columns=[df['DemoBin'], df['ConfBin']], dropna=False))
     return df
 
 
-def macro_tpr_table(df, categories):
+def fairness_gaps_table(df, categories):
     """
     Compute macro-TPR by demographic and confounding factor bins.
     """
-    # Convert emotion names to indices
     emotion_map = {name: idx for idx, name in enumerate(categories)}
-    y = df['EmotionGt'].map(emotion_map).values
+    anno = df['EmotionGt'].map(emotion_map).values
     pred = df['EmotionPred'].map(emotion_map).values
-    # Map gender names to indices
-    gender_map = {'Female': 0, 'Male': 1}
-    gender = df['Gender'].map(gender_map).values
     # Create results table
     rows = []
-    for g in [0, 1]:
-        for illum_bin in ['0_125', '125_255']:
-            mask = (gender == g) & (df['ConfBin'] == illum_bin)
-            y_filtered = y[mask]
-            pred_filtered = pred[mask]
-            # Compute confusion matrix and TPRs
-            cm = np.zeros((len(categories), len(categories)), dtype=np.int64)
-            if y_filtered.size == 0:
-                return cm
-            np.add.at(cm, (y_filtered, pred_filtered), 1)
-            den = cm.sum(axis=1).astype(np.float64)
-            tpr = np.full(cm.shape[0], np.nan, dtype=np.float64)
-            valid = den > 0
-            tpr[valid] = cm.diagonal()[valid] / den[valid]
-            macro_tpr = np.nanmean(tpr)*100
-            gender_name = 'Female' if g == 0 else 'Male'
-            rows.append({
-                'gender': gender_name,
-                'illumination': illum_bin,
-                'macro_tpr': macro_tpr
-            })
-    # Create pivot table
-    df_results = pd.DataFrame(rows)
-    table = df_results.pivot(index='gender', columns='illumination', values='macro_tpr')
-    table = table[['0_125', '125_255']]  # Ensure column order
-    table.columns = ['0-125', '125-255']
-    # Calculate gap (M-F) per illumination bin, then average
-    gap_per_bin = table.loc['Male'].values - table.loc['Female'].values
-    gap_avg = np.mean(gap_per_bin)
-    table['Gap (M-F)'] = gap_avg
-    print(table.to_string(float_format=lambda x: f"{x:.4f}"))
+    for d in df["DemoBin"].unique():
+        # Aggregate over ALL poses (ConfBin)
+        mask = df["DemoBin"] == d
+        cm = _confusion_matrix_expr(anno[mask], pred[mask], len(categories))
+        score = _macro_tpr_from_confusion(cm)
+        rows.append({"demo": d, "conf": "All", "macro_tpr": score})
+        # For each counfounding factor individually
+        for c in df["ConfBin"].unique():
+            mask = (df["DemoBin"] == d) & (df["ConfBin"] == c)
+            cm = _confusion_matrix_expr(anno[mask], pred[mask], len(categories))
+            score = _macro_tpr_from_confusion(cm)
+            rows.append({"demo": d, "conf": c, "macro_tpr": score})
+    print("\n=== Macro-TPR (%) per demographic factor using a visual confounder ===")
+    df = pd.DataFrame(rows)
+    table = df.pivot(index="demo", columns="conf", values="macro_tpr").sort_index()
+    print(table.to_string(float_format=lambda x: f"{x:.2f}"))
+    print("\n=== Empirical and standardized fairness gaps (%) ===")
+    gap = float(table.loc["Male", "All"] - table.loc["Female", "All"])
+    gap_std = float(np.mean(table.loc["Male", table.columns[:2]].to_numpy(dtype=np.float64) - table.loc["Female", table.columns[:2]].to_numpy(dtype=np.float64)))
+    print(f"GAP: {gap:.6f}")
+    print(f"GAPstd: {gap_std:.6f}")
+    print(f"∆: {gap-gap_std:.6f}")
 
 
 def _confusion_matrix_expr(y, pred, num_classes):
@@ -179,78 +170,6 @@ def _macro_tpr_from_confusion(cm):
         return float("nan")
     return float(np.mean(tpr[valid]))*100
 
-def fairness_gaps_table(df, categories):
-    """
-    Compute fairness gaps by demographic and confounding factor bins.
-    """
-    emotion_map = {name: idx for idx, name in enumerate(categories)}
-    # Convert emotion names to indices
-    y = df['EmotionGt'].map(emotion_map).values
-    pred = df['EmotionPred'].map(emotion_map).values
-    
-    # Compute confusion matrices per gender
-    cm_f = _confusion_matrix_expr(y[df['Gender'] == 'Female'], pred[df['Gender'] == 'Female'], len(categories))
-    cm_m = _confusion_matrix_expr(y[df['Gender'] == 'Male'], pred[df['Gender'] == 'Male'], len(categories))
-    
-    m_f = _macro_tpr_from_confusion(cm_f)
-    m_m = _macro_tpr_from_confusion(cm_m)
-    gap_obs = float(m_m - m_f)
-    
-    print(f"M_female: {m_f:.6f}")
-    print(f"M_male:   {m_m:.6f}")
-    print(f"GAP: {gap_obs:.6f}")
-
-    MIN_PER_BIN = 20
-    
-    # Convert emotion names to indices
-    y = df['EmotionGt'].map(emotion_map).values
-    pred = df['EmotionPred'].map(emotion_map).values
-    illumination_bins = df['ConfBin'].values
-    
-    # Map illumination bins
-    illum_map = {'0_125': 0, '125_255': 1}
-    illumination_id = pd.Series(illumination_bins).map(illum_map).values
-    
-    num_illum_bins = 2
-    
-    # Count samples per gender and illumination bin
-    counts_f = np.bincount(illumination_id[df['Gender'] == 'Female'], minlength=num_illum_bins).astype(np.int64)
-    counts_m = np.bincount(illumination_id[df['Gender'] == 'Male'], minlength=num_illum_bins).astype(np.int64)
-    
-    # Determine supported bins
-    supported = (counts_f >= MIN_PER_BIN) & (counts_m >= MIN_PER_BIN)
-    supported_idx = np.where(supported)[0]
-    
-    if supported_idx.size == 0:
-        print("G_std (M-F): nan")
-        return
-    
-    # Compute weights
-    w_ref = np.zeros(num_illum_bins, dtype=np.float64)
-    w_ref[supported] = 1.0 / float(supported.sum())
-    
-    # Compute macro-TPR per gender and illumination bin
-    m_gb = np.full((2, num_illum_bins), np.nan, dtype=np.float64)
-    
-    for iid in supported_idx:
-        # Female
-        mask_f = (df['Gender'] == 'Female') & (illumination_id == iid)
-        cm_f = _confusion_matrix_expr(y[mask_f], pred[mask_f], len(categories))
-        m_gb[0, iid] = _macro_tpr_from_confusion(cm_f)
-        
-        # Male
-        mask_m = (df['Gender'] == 'Male') & (illumination_id == iid)
-        cm_m = _confusion_matrix_expr(y[mask_m], pred[mask_m], len(categories))
-        m_gb[1, iid] = _macro_tpr_from_confusion(cm_m)
-    
-    # Compute standardized gap
-    m_std_f = float(np.sum(w_ref[supported] * m_gb[0, supported]))
-    m_std_m = float(np.sum(w_ref[supported] * m_gb[1, supported]))
-    gap_std = float(m_std_m - m_std_f)
-    
-    print(f"GAPstd: {gap_std:.6f}")
-    print(f"∆: {gap_obs-gap_std:.6f}")
-
 
 def main():
     """
@@ -260,7 +179,7 @@ def main():
     anns, categories = load_annotations(anns_file)
     # Analyze annotation data
     print("\n=== Expression counts within each demomographic-confounding factor bin ===")
-    records = [{'Yaw': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].score} for seq in anns for img in seq.images for obj in img.objects]
+    records = [{'Pose': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].score} for seq in anns for img in seq.images for obj in img.objects]
     df = pd.DataFrame.from_records(records)
     df = expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
     # Load computer vision components
@@ -304,9 +223,6 @@ def main():
         ofs.close()
     # Compute unbiased metrics
     df['EmotionPred'] = preds
-    print("\n=== Macro-TPR (%) per demographic factor using a visual confounder ===")
-    macro_tpr_table(df, categories)
-    print("\n=== Empirical and standardized fairness gaps (%) per demographic factor using a visual confounder ===")
     fairness_gaps_table(df, categories)
 
 if __name__ == '__main__':
