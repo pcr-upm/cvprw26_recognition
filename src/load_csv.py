@@ -118,3 +118,26 @@ def parse_affwild2(split):
         rec["race"] = RACE_STR_TO_ID.get(r["ethnicity"])
         samples.append(rec)
     return samples
+
+
+def parse_multipie(split):
+    df = pd.read_csv(split)
+    samples = []
+    RACE_STR_TO_ID = {"Asian": 0, "Indian": 1, "Black": 2, "White": 3}
+    for _, r in df.iterrows():
+        samples.append(
+            {
+                "path": str(r["abs_path"]),
+                "expression": int(r["expression_id"]),
+                "expression_name": r["expression_name"].strip().lower(),
+                "gender": 1 if str(r.get("gender_norm", r.get("gender"))).strip().lower() == "male" else 0,
+                "gender_str": r["gender"].strip().lower(),
+                "race": RACE_STR_TO_ID.get(r["ethnicity"]),
+                "yaw": 0 if str(r["camera_id"]) in ["14_0", "05_1", "05_0"] else 1,
+                "pitch": 0,
+                "roll": 0,
+                "illumination": int(str(r["filename"]).split("_")[-1].split(".")[0]),
+                "identity": str(r["subject_id"]),
+            }
+        )
+    return samples

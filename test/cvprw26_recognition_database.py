@@ -56,7 +56,7 @@ def load_annotations(anns_file):
     from images_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
     from images_framework.src.categories import Name
     from images_framework.categories.emotions import Emotion as Oe
-    from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2
+    from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2, parse_multipie
     print('Open annotations file: ' + str(anns_file))
     if os.path.isfile(anns_file) and anns_file == 'csv/rafdb_test_pose_bboxq_illum.csv':
         dbpath = '/media/bobetocalo/database/classification/faces/expressions/raf/basic/'
@@ -76,6 +76,12 @@ def load_annotations(anns_file):
         race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White')}
         categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
         samples = parse_affwild2(Path(anns_file))
+    elif os.path.isfile(anns_file) and anns_file == 'csv/test_expr_gender_pose_balanced.csv':
+        dbpath = '/media/bobetocalo/database/classification/faces/expressions/MultiPie/'
+        gender = {0: Name('Female'), 1: Name('Male')}
+        race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White')}
+        categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SURPRISE, 3: Oe.FACE.OTHER, 4: Oe.FACE.DISGUST, 5: Oe.FACE.FEAR}
+        samples = parse_multipie(Path(anns_file))
     else:
         raise ValueError('Annotations file does not exist')
     anns = []

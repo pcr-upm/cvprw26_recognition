@@ -36,6 +36,7 @@ class CVPRW26Recognition(Recognition):
     def parse_options(self, params):
         super().parse_options(params)
         import argparse
+        from images_framework.categories.emotions import Emotion as Oe
         parser = argparse.ArgumentParser(prog='CVPRW26Recognition', add_help=False)
         parser.add_argument('--gpu', dest='gpu', type=int, action='append',
                             help='GPU ID (negative value indicates CPU).')
@@ -54,25 +55,18 @@ class CVPRW26Recognition(Recognition):
         self.epoch = args.epoch
         self.patience = args.patience
         if self.database == 'fer2013':
-            from images_framework.categories.emotions import Emotion as Oe
             self.classes = {0: Oe.FACE.ANGER, 1: Oe.FACE.DISGUST, 2: Oe.FACE.FEAR, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.NEUTRAL, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE}
-            self.depth = DepthMode.UBYTE
-            self.channels = ChannelsMode.THREE
         elif self.database == 'raf':
-            from images_framework.categories.emotions import Emotion as Oe
             self.classes = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
-            self.depth = DepthMode.UBYTE
-            self.channels = ChannelsMode.THREE
         elif self.database == 'affectnet':
-            from images_framework.categories.emotions import Emotion as Oe
             self.classes = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
-            self.depth = DepthMode.UBYTE
-            self.channels = ChannelsMode.THREE
         elif self.database == 'affwild2':
-            from images_framework.categories.emotions import Emotion as Oe
             self.classes = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
-            self.depth = DepthMode.UBYTE
-            self.channels = ChannelsMode.THREE
+        elif self.database == 'multipie':
+            self.classes = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SURPRISE, 3: Oe.FACE.OTHER, 4: Oe.FACE.DISGUST, 5: Oe.FACE.FEAR}
+        self.depth = DepthMode.UBYTE
+        self.channels = ChannelsMode.THREE
+
     def train(self, anns_train, anns_valid):
         print('Training model')
 
@@ -83,7 +77,7 @@ class CVPRW26Recognition(Recognition):
         from src.checkpoint_loader import load_submodel_state_dict
         # Set up a neural network to train
         print('Load model')
-        self.model = FERBaselineNet(num_expr=len(self.classes), pretrained_backbone=False)
+        self.model = FERBaselineNet(self.database, num_expr=len(self.classes), pretrained_backbone=False)
         torchinfo.summary(self.model, input_size=(self.batch_size, 3, self.width, self.height), depth=5, device=self.device.type, col_names=['input_size', 'output_size', 'num_params', 'kernel_size'])
         if mode is Modes.TEST:
             model_path = self.path + 'data/' + self.database + '/'

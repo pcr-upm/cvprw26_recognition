@@ -59,9 +59,9 @@ class MLPHead(nn.Module):
 
 
 class FERBaselineNet(nn.Module):
-    def __init__(self, num_expr: int, pretrained_backbone: bool = True, dropout: float = 0.0):
+    def __init__(self, database: str, num_expr: int, pretrained_backbone: bool = True, dropout: float = 0.0):
         super().__init__()
-        self.backbone = ResNet50Backbone(pretrained=pretrained_backbone)
+        self.backbone = ResNet50Backbone(pretrained=pretrained_backbone) if database != 'multipie' else ResNet18Backbone(pretrained=pretrained_backbone)
         self.head_expr = MLPHead(self.backbone.out_dim, num_expr, dropout=dropout)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
