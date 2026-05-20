@@ -56,20 +56,26 @@ def load_annotations(anns_file):
     from images_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
     from images_framework.src.categories import Name
     from images_framework.categories.emotions import Emotion as Oe
-    from src.load_csv import parse_rafdb, parse_affectnet
+    from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2
     print('Open annotations file: ' + str(anns_file))
     if os.path.isfile(anns_file) and anns_file == 'csv/rafdb_test_pose_bboxq_illum.csv':
-        dbpath = '/home/database/classification/faces/expressions/raf/basic/'
+        dbpath = '/media/bobetocalo/database/classification/faces/expressions/raf/basic/'
         gender = {0: Name('Male'), 1: Name('Female')}
         race = {0: Name('Caucasian'), 1: Name('African-American'), 2: Name('Asian')}
         categories = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
         samples = parse_rafdb(Path(anns_file))
     elif os.path.isfile(anns_file) and anns_file == 'csv/affectnetplus_test_annotations_quality_illum.csv':
-        dbpath = '/home/database/classification/faces/expressions/affectnet/'
+        dbpath = '/media/bobetocalo/database/classification/faces/expressions/affectnet/'
         gender = {0: Name('Female'), 1: Name('Male')}
         race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White'), 4: Name('Middle-Eastern'), 5: Name('Latino-Hispanic')}
         categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
         samples = parse_affectnet(Path(anns_file))
+    elif os.path.isfile(anns_file) and anns_file == 'csv/dataframe_val_pose_demographic_illum.csv':
+        dbpath = '/media/bobetocalo/database/classification/faces/expressions/affwild2/'
+        gender = {0: Name('Female'), 1: Name('Male')}
+        race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White')}
+        categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
+        samples = parse_affwild2(Path(anns_file))
     else:
         raise ValueError('Annotations file does not exist')
     anns = []

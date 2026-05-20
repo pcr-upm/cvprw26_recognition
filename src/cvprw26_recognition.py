@@ -68,7 +68,11 @@ class CVPRW26Recognition(Recognition):
             self.classes = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
             self.depth = DepthMode.UBYTE
             self.channels = ChannelsMode.THREE
-
+        elif self.database == 'affwild2':
+            from images_framework.categories.emotions import Emotion as Oe
+            self.classes = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
+            self.depth = DepthMode.UBYTE
+            self.channels = ChannelsMode.THREE
     def train(self, anns_train, anns_valid):
         print('Training model')
 
