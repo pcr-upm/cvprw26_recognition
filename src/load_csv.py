@@ -7,7 +7,13 @@ import numpy as np
 import pandas as pd
 
 
-def _to_float_or_none(x):
+# Shared constants
+GENDER_STR_TO_ID = {"Female": 0, "Male": 1}
+RACE_STR_TO_ID = {"Asian": 0, "Indian": 1, "Black": 2, "White": 3}
+
+
+def _safe_float(x):
+    """Convert to float, return None if invalid or non-finite."""
     if pd.isna(x):
         return None
     try:
@@ -17,127 +23,98 @@ def _to_float_or_none(x):
         return None
 
 
-def _to_int_or_none(x):
+def _safe_int(x):
+    """Convert to int, return None if invalid."""
     if pd.isna(x):
         return None
     try:
-        v = int(float(x))
-        return v
+        return int(float(x))
     except Exception:
         return None
 
 
-def parse_rafdb(csv_path):
-    df = pd.read_csv(csv_path)
+def _build_sample(path, expression, gender=None, race=None, yaw=None, illumination=None):
+    """Build a sample record with standard shared fields."""
+    sample = {
+        "path": str(path),
+        "expression": expression,
+    }
+    if gender is not None:
+        sample["gender"] = gender
+    if race is not None:
+        sample["race"] = race
+    if yaw is not None:
+        sample["yaw"] = yaw
+    if illumination is not None:
+        sample["illumination"] = illumination
+    return sample
+
+
+def parse_rafdb(split):
+    """Parse RAF-DB dataset."""
+    df = pd.read_csv(split)
     samples = []
-    for _, r in df.iterrows():
-        expr_id = int(r["expression"])
-        gender_id = int(r["gender"]) if pd.notna(r["gender"]) else None
-        if gender_id == 2:  # To skip unsure gender values, as they do in the paper
+    for _, row in df.iterrows():
+        gender_id = _safe_int(row["gender"])
+        if gender_id == 2:  # Skip unsure gender values
             continue
-        race_id = int(r["race"]) if pd.notna(r["race"]) else None
-        age_id = int(r["age"]) if pd.notna(r["age"]) else None
-        rec = {
-            "path": str(r["path"]),
-            "expression": expr_id,
-            "gender": gender_id,
-            "race": race_id,
-            "age": age_id,
-        }
-        for k in ["yaw", "pitch", "roll", "bbox_h", "illumination"]:
-            if k in df.columns:
-                v = _to_float_or_none(r[k])
-                if v is not None:
-                    rec[k] = v
-        samples.append(rec)
+        yaw = _safe_float(row.get("yaw"))
+        illumination = _safe_float(row.get("illumination"))
+        sample = _build_sample(path=row["path"], expression=int(row["expression"]), gender=gender_id, race=_safe_int(row["race"]), yaw=yaw, illumination=illumination)
+        samples.append(sample)
     return samples
 
 
 def parse_affectnet(split):
+    """Parse AffectNet dataset."""
     df = pd.read_csv(split)
+    # Extract probability columns
     gender_cols = [c for c in df.columns if c.startswith("gender_")]
     race_cols = [c for c in df.columns if c.startswith("race_")]
-    df[gender_cols + race_cols + ["yaw", "pitch", "roll"]] = df[gender_cols + race_cols + ["yaw", "pitch", "roll"]].apply(pd.to_numeric, errors="coerce")
-    df = df.dropna(subset=["image_path", "human_label", "yaw", "pitch", "roll"] + gender_cols + race_cols).reset_index(drop=True)
+    # Convert numeric columns
+    df[gender_cols + race_cols + ["yaw"]] = df[gender_cols + race_cols + ["yaw"]].apply(pd.to_numeric, errors="coerce")
+    df = df.dropna(subset=["image_path", "human_label", "yaw"] + gender_cols + race_cols).reset_index(drop=True)
     samples = []
-    for _, r in df.iterrows():
-        gender_probs = r[gender_cols].to_numpy(dtype="float32")
-        race_probs = r[race_cols].to_numpy(dtype="float32")
-        gender_id = int(gender_probs.argmax())
-        race_id = int(race_probs.argmax())
-        expr_id = int(r["human_label"])
-        yaw = float(r["yaw"])
-        pitch = float(r["pitch"])
-        roll = float(r["roll"])
-        illumination = float(r["illumination"])
-        samples.append(
-            {
-                "path": str(r["image_path"]),
-                "expression": expr_id,
-                "gender": gender_id,
-                "race": race_id,
-                "yaw": yaw,
-                "pitch": pitch,
-                "roll": roll,
-                "illumination": illumination,
-            }
-        )
+    for _, row in df.iterrows():
+        gender_id = int(row[gender_cols].to_numpy(dtype="float32").argmax())
+        race_id = int(row[race_cols].to_numpy(dtype="float32").argmax())
+        sample = _build_sample(path=row["image_path"], expression=int(row["human_label"]), gender=gender_id, race=race_id, yaw=float(row["yaw"]), illumination=float(row["illumination"]))
+        samples.append(sample)
     return samples
 
 
 def parse_affwild2(split):
+    """Parse AffWild2 dataset."""
     df = pd.read_csv(split)
     df["expr"] = pd.to_numeric(df["expr"], errors="coerce")
     df = df.dropna(subset=["image_path", "expr"]).reset_index(drop=True)
     samples = []
-    GENDER_STR_TO_ID = {"Female": 0, "Male": 1}
-    RACE_STR_TO_ID = {"Asian": 0, "Indian": 1, "Black": 2, "White": 3}
-    for _, r in df.iterrows():
-        expr_id = _to_int_or_none(r["expr"])
+    for _, row in df.iterrows():
+        expr_id = _safe_int(row["expr"])
         if expr_id is None:
             continue
-        rec = {
-            "path": str(r["image_path"]),
-            "expression": expr_id,
-        }
-        for k in ["video", "frame_idx", "subject", "split"]:
-            if k in df.columns:
-                v = r[k]
-                if not pd.isna(v):
-                    rec[k] = v
-        for k in ["valence", "arousal", "yaw", "pitch", "roll", "illumination"]:
-            if k in df.columns:
-                v = _to_float_or_none(r[k])
-                if v is not None:
-                    rec[k] = v
-        if "age" in df.columns:
-            a = _to_int_or_none(r["age"])
-            if a is not None:
-                rec["age"] = a
-        rec["gender"] = GENDER_STR_TO_ID.get(r["gender"])
-        rec["race"] = RACE_STR_TO_ID.get(r["ethnicity"])
-        samples.append(rec)
+        gender_id = GENDER_STR_TO_ID.get(row.get("gender"))
+        race_id = RACE_STR_TO_ID.get(row.get("ethnicity"))
+        yaw = _safe_float(row.get("yaw"))
+        illumination = _safe_float(row.get("illumination"))
+        sample = _build_sample(path=row["image_path"], expression=expr_id, gender=gender_id, race=race_id, yaw=yaw, illumination=illumination)
+        samples.append(sample)
     return samples
 
 
 def parse_multipie(split):
+    """Parse Multi-PIE dataset."""
     df = pd.read_csv(split)
     samples = []
-    RACE_STR_TO_ID = {"Asian": 0, "Indian": 1, "Black": 2, "White": 3}
-    for _, r in df.iterrows():
-        samples.append(
-            {
-                "path": str(r["abs_path"]),
-                "expression": int(r["expression_id"]),
-                "expression_name": r["expression_name"].strip().lower(),
-                "gender": 1 if str(r.get("gender_norm", r.get("gender"))).strip().lower() == "male" else 0,
-                "gender_str": r["gender"].strip().lower(),
-                "race": RACE_STR_TO_ID.get(r["ethnicity"]),
-                "yaw": 0 if str(r["camera_id"]) in ["14_0", "05_1", "05_0"] else 1,
-                "pitch": 0,
-                "roll": 0,
-                "illumination": int(str(r["filename"]).split("_")[-1].split(".")[0]),
-                "identity": str(r["subject_id"]),
-            }
-        )
+    for _, row in df.iterrows():
+        # Determine gender (prefer gender_norm if available)
+        gender_str = str(row.get("gender_norm", row.get("gender"))).strip().lower()
+        gender_id = 1 if gender_str == "male" else 0
+        # Determine yaw from camera_id
+        camera_id = str(row["camera_id"])
+        yaw = 0 if camera_id in ["14_0", "05_1", "05_0"] else 1
+        # Extract illumination from filename
+        illumination = int(str(row["filename"]).split("_")[-1].split(".")[0])
+        sample = _build_sample(path=row["abs_path"], expression=int(row["expression_id"]), gender=gender_id, race=RACE_STR_TO_ID.get(row.get("ethnicity")), yaw=yaw, illumination=illumination)
+        samples.append(sample)
     return samples
