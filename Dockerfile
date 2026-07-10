@@ -35,5 +35,5 @@ ENV PATH /home/username/conda/envs/cvprw26/bin:/home/username/conda/bin:$PATH
 # Make RUN commands use the new environment (source activate cvprw26)
 SHELL ["conda", "run", "-n", "cvprw26", "/bin/bash", "-c"]
 # Install dependencies
-RUN pip install images-framework tqdm matplotlib pandas
-RUN pip install torch torchvision torchinfo --index-url https://download.pytorch.org/whl/cu121
+RUN conda run -n cvprw26 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121 
+RUN conda run -n cvprw26 pip install images-framework tqdm matplotlib pandas torchinfo
