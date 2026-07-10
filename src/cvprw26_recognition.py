@@ -24,9 +24,6 @@ class CVPRW26Recognition(Recognition):
         self.path = path
         self.model = None
         self.gpu = None
-        self.batch_size = None
-        self.epoch = None
-        self.patience = None
         self.width = 224
         self.height = 224
         self.classes = None
@@ -40,20 +37,11 @@ class CVPRW26Recognition(Recognition):
         parser = argparse.ArgumentParser(prog='CVPRW26Recognition', add_help=False)
         parser.add_argument('--gpu', dest='gpu', type=int, action='append',
                             help='GPU ID (negative value indicates CPU).')
-        parser.add_argument('--batch-size', dest='batch_size', type=int, default=16,
-                            help='Number of images in each mini-batch.')
-        parser.add_argument('--epoch', dest='epoch', type=int, default=1000,
-                            help='Number of sweeps over the dataset to train.')
-        parser.add_argument('--patience', dest='patience', type=int, default=40,
-                            help='Number of epochs with no improvement after which training will be stopped.')
         args, unknown = parser.parse_known_args(params)
         print(parser.format_usage())
         mode_gpu = torch.cuda.is_available() and -1 not in args.gpu
         self.gpus = args.gpu
         self.device = torch.device('cuda' if mode_gpu else 'cpu')
-        self.batch_size = args.batch_size
-        self.epoch = args.epoch
-        self.patience = args.patience
         if self.database == 'fer2013':
             self.classes = {0: Oe.FACE.ANGER, 1: Oe.FACE.DISGUST, 2: Oe.FACE.FEAR, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.NEUTRAL, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE}
         elif self.database == 'raf':
@@ -78,7 +66,7 @@ class CVPRW26Recognition(Recognition):
         # Set up a neural network to train
         print('Load model')
         self.model = FERBaselineNet(self.database, num_expr=len(self.classes), pretrained_backbone=False)
-        torchinfo.summary(self.model, input_size=(self.batch_size, 3, self.width, self.height), depth=5, device=self.device.type, col_names=['input_size', 'output_size', 'num_params', 'kernel_size'])
+        torchinfo.summary(self.model, input_size=(1, 3, self.width, self.height), depth=5, device=self.device.type, col_names=['input_size', 'output_size', 'num_params', 'kernel_size'])
         if mode is Modes.TEST:
             model_path = self.path + 'data/' + self.database + '/'
             print('Loading model from {}'.format(model_path))

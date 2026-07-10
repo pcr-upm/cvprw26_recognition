@@ -10,7 +10,7 @@ RUN touch /root/.ssh/known_hosts
 RUN ssh-keyscan github.com >> /root/.ssh/known_hosts
 # Download the computer vision framework
 RUN git clone git@github.com:pcr-upm/images_framework.git images_framework
-RUN git clone git@github.com:bobetocalo/cvprw26_recognition.git cvprw26_recognition
+RUN git clone git@github.com:pcr-upm/cvprw26_recognition.git cvprw26_recognition
 ADD data /cvprw26_recognition/data
 
 # Copy the repository from the previous image
