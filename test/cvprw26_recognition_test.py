@@ -66,7 +66,7 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
         for line in json.load(open(ifs))['annotations']:
             obj = PersonObject()
             bbox = line['bbox']
-            obj.bb = (float(bbox['pt1_x']), float(bbox['pt1_y']), float(bbox['pt2_x']), float(bbox['pt2_y']))
+            obj.bb = (int(float(bbox['pt1_x'])), int(float(bbox['pt1_y'])), int(float(bbox['pt2_x'])), int(float(bbox['pt2_y'])))
             for lnd in line['landmarks']:
                 name = list(landmarks.keys())[next((ids for ids, xs in enumerate(landmarks.values()) for x in xs if x == lnd['label']), None)].value 
                 lp = next((elem for part in lps.keys() for elem in part if elem.value == name), None)
