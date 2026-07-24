@@ -15,7 +15,7 @@ from pathlib import Path
 from images_framework.src.constants import Modes
 from images_framework.src.datasets import Database
 from images_framework.src.composite import Composite
-from images_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericLandmark, GenericCategory
+from images_framework.src.annotations import GenericVideo, GenericImage, PersonObject, GenericLandmark, GenericCategory
 from images_framework.src.viewer import Viewer
 from images_framework.src.utils import load_geoimage
 from images_framework.regression.alignment.landmarks import lps
@@ -51,11 +51,10 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
     """
     datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
     # Read annotations
-    ann, pred = GenericGroup(), GenericGroup()
+    ann, pred = GenericVideo(), GenericVideo()
     img_ann = GenericImage(filename)
     img, _ = load_geoimage(img_ann.filename)
     img_ann.tile = np.array([0, 0, img.shape[1], img.shape[0]])
-    pred.add_image(copy.deepcopy(img_ann))
     ifs = os.path.splitext(filename)[0]+'.json'
     if os.path.exists(ifs):
         db = Database.__subclasses__()[next((idx for idx, subset in enumerate(datasets) if json.load(open(ifs))['database'] in subset), None)]()
@@ -86,6 +85,10 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
         sd.load(Modes.TEST)
         sd.process(ann, pred)
     ann.add_image(img_ann)
+    pred.add_image(copy.deepcopy(img_ann))
+    for img_pred in pred.images:
+        for obj_pred in img_pred.objects:
+            obj_pred.clear()
     # Process frame and show results
     ticks = cv2.getTickCount()
     composite.process(ann, pred)
