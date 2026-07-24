@@ -75,7 +75,6 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
             obj.add_attribute(GenericCategory(gender[int(attributes['gender'])]))
             obj.add_attribute(GenericCategory(race[int(attributes['race'])]))
             obj.add_attribute(GenericCategory(age[int(attributes['age'])]))
-            pred.images[-1].add_object(copy.deepcopy(obj))
             obj.add_category(GenericCategory(categories[int(attributes['emotion'])]))
             img_ann.add_object(obj)
     else:
