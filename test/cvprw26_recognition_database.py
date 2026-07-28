@@ -214,14 +214,14 @@ def main():
             for img_pred in pred.images:
                 viewer.set_image(img_pred)
             composite.show(viewer, anns[i], pred)
-            viewer.show(0)
+            viewer.show(0, as_video=False)
         if save_file:
             composite.evaluate(ofs, anns[i], pred)
         if save_image:
             for img_pred in pred.images:
                 viewer.set_image(img_pred)
             composite.show(viewer, anns[i], pred)
-            viewer.save_image(dirname)
+            viewer.save(dirname, as_video=False, format='tif')
             composite.save(dirname, pred)
     if save_file:
         ofs.close()

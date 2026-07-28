@@ -98,12 +98,12 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
         composite.show(viewer, ann, pred)
         fps = 'FPS = ' + "{0:.3f}".format(cv2.getTickFrequency() / ticks)
         viewer.text(pred.images[0], fps, (20, np.shape(viewer.get_image(pred.images[0]))[0] - 20), 0.5, (0, 255, 0))
-        viewer.show(delay)
+        viewer.show(delay, as_video=False)
     if save_image:
         for img_pred in pred.images:
             viewer.set_image(img_pred)
         composite.show(viewer, ann, pred)
-        viewer.save_image(dirname)
+        viewer.save(dirname, as_video=False, format='tif')
         composite.save(dirname, pred)
 
 
