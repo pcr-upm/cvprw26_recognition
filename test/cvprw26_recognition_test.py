@@ -103,7 +103,7 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
         for img_pred in pred.images:
             viewer.set_image(img_pred)
         composite.show(viewer, ann, pred)
-        viewer.save(dirname)
+        viewer.save_image(dirname)
         composite.save(dirname, pred)
 
 

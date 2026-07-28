@@ -221,7 +221,7 @@ def main():
             for img_pred in pred.images:
                 viewer.set_image(img_pred)
             composite.show(viewer, anns[i], pred)
-            viewer.save(dirname)
+            viewer.save_image(dirname)
             composite.save(dirname, pred)
     if save_file:
         ofs.close()
