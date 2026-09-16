@@ -26,8 +26,8 @@ class CVPRW26Recognition(Recognition):
         self.gpu = None
         self.width = 224
         self.height = 224
-        self.depth = None
-        self.channels = None
+        self.depth = DepthMode.UBYTE
+        self.channels = ChannelsMode.THREE
 
     def parse_options(self, params):
         super().parse_options(params)
@@ -40,8 +40,6 @@ class CVPRW26Recognition(Recognition):
         mode_gpu = torch.cuda.is_available() and -1 not in args.gpu
         self.gpus = args.gpu
         self.device = torch.device('cuda' if mode_gpu else 'cpu')
-        self.depth = DepthMode.UBYTE
-        self.channels = ChannelsMode.THREE
 
     def train(self, anns_train, anns_valid):
         print('Training model')
@@ -55,9 +53,10 @@ class CVPRW26Recognition(Recognition):
         datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
         idx = [datasets.index(subset) for subset in datasets if self.database in subset]
         categories = Database.__subclasses__()[idx[0]]().get_categories()
+        classes = {i: category for i, category in enumerate(categories.values())}
         # Set up a neural network to train
         print('Load model')
-        self.model = FERBaselineNet(self.database, num_expr=len(categories), pretrained_backbone=False)
+        self.model = FERBaselineNet(self.database, num_expr=len(classes), pretrained_backbone=False)
         torchinfo.summary(self.model, input_size=(1, 3, self.width, self.height), depth=5, device=self.device.type, col_names=['input_size', 'output_size', 'num_params', 'kernel_size'])
         if mode is Modes.TEST:
             model_path = self.path + 'data/' + self.database + '/'
@@ -71,16 +70,10 @@ class CVPRW26Recognition(Recognition):
         from torchvision import transforms
         from torchvision.transforms import InterpolationMode
         from pcr_framework.src.datasets import Database
-        from pcr_framework.categories.emotions import Emotion as Oe
         datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
         idx = [datasets.index(subset) for subset in datasets if self.database in subset]
         categories = Database.__subclasses__()[idx[0]]().get_categories()
-        if self.database == 'raf':
-            categories = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
-        elif self.database == 'affwild2':
-            categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
-        elif self.database == 'multipie':
-            categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SURPRISE, 3: Oe.FACE.OTHER, 4: Oe.FACE.DISGUST, 5: Oe.FACE.FEAR}
+        classes = {i: category for i, category in enumerate(categories.values())}
         transform = transforms.Compose([
                 transforms.Resize((100, 100), interpolation=InterpolationMode.BILINEAR),
                 transforms.CenterCrop(96),
@@ -102,4 +95,4 @@ class CVPRW26Recognition(Recognition):
                     idx = logits.argmax(dim=1).item()
                     score = torch.softmax(logits, dim=1)[0, idx].item()
                     # Save prediction
-                    obj_pred.add_category(GenericCategory(categories[idx], score))
+                    obj_pred.add_category(GenericCategory(classes[idx], score))
