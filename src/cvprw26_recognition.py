@@ -8,9 +8,9 @@ import sys
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')))
 import torch
 import numpy as np
-from images_framework.src.annotations import GenericCategory
-from images_framework.src.utils import load_geoimage, DepthMode, ChannelsMode
-from images_framework.src.recognition import Recognition
+from pcr_framework.src.annotations import GenericCategory
+from pcr_framework.src.utils import load_geoimage, DepthMode, ChannelsMode
+from pcr_framework.src.recognition import Recognition
 os.environ['PYTHONHASHSEED'] = '0'
 np.random.seed(42)
 
@@ -33,7 +33,7 @@ class CVPRW26Recognition(Recognition):
     def parse_options(self, params):
         super().parse_options(params)
         import argparse
-        from images_framework.categories.emotions import Emotion as Oe
+        from pcr_framework.categories.emotions import Emotion as Oe
         parser = argparse.ArgumentParser(prog='CVPRW26Recognition', add_help=False)
         parser.add_argument('--gpu', dest='gpu', type=int, action='append',
                             help='GPU ID (negative value indicates CPU).')
@@ -60,7 +60,7 @@ class CVPRW26Recognition(Recognition):
 
     def load(self, mode):
         import torchinfo
-        from images_framework.src.constants import Modes
+        from pcr_framework.src.constants import Modes
         from src.models_fer import FERBaselineNet
         from src.checkpoint_loader import load_submodel_state_dict
         # Set up a neural network to train

@@ -31,4 +31,4 @@ ENV PATH /home/username/conda/envs/cvprw26/bin:/home/username/conda/bin:$PATH
 SHELL ["conda", "run", "-n", "cvprw26", "/bin/bash", "-c"]
 # Install dependencies
 RUN conda run -n cvprw26 pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121 
-RUN conda run -n cvprw26 pip install images-framework tqdm matplotlib pandas torchinfo
+RUN conda run -n cvprw26 pip install pcr-framework tqdm matplotlib pandas torchinfo

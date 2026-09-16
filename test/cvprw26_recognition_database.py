@@ -13,9 +13,9 @@ import importlib.util
 from tqdm import tqdm
 from pathlib import Path
 from scipy.spatial.transform import Rotation
-from images_framework.src.constants import Modes
-from images_framework.src.composite import Composite
-from images_framework.src.viewer import Viewer
+from pcr_framework.src.constants import Modes
+from pcr_framework.src.composite import Composite
+from pcr_framework.src.viewer import Viewer
 from src.cvprw26_recognition import CVPRW26Recognition
 
 
@@ -53,9 +53,9 @@ def load_annotations(anns_file):
     Load ground truth annotations according to each database.
     """
     from PIL import Image
-    from images_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
-    from images_framework.src.categories import Name
-    from images_framework.categories.emotions import Emotion as Oe
+    from pcr_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
+    from pcr_framework.src.categories import Name
+    from pcr_framework.categories.emotions import Emotion as Oe
     from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2, parse_multipie
     print('Open annotations file: ' + str(anns_file))
     if os.path.isfile(anns_file) and anns_file in ['csv/rafdb_test_pose_bboxq_illum.csv']:

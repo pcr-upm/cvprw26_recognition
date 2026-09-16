@@ -9,12 +9,7 @@ IEEE Conference on Computer Vision and Pattern Recognition Workshops, CVPRW 2026
 ```
 
 #### Requisites
-- images-framework
-- tqdm
-- matplotlib
-- pandas
-- pytorch
-- torchinfo
+The required dependencies are installed in the [`Dockerfile`](./Dockerfile#L33-L34).
 
 #### Usage
 ```

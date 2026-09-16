@@ -12,13 +12,13 @@ import copy
 import numpy as np
 import importlib.util
 from pathlib import Path
-from images_framework.src.constants import Modes
-from images_framework.src.datasets import Database
-from images_framework.src.composite import Composite
-from images_framework.src.annotations import GenericVideo, GenericImage, PersonObject, GenericLandmark, GenericCategory
-from images_framework.src.viewer import Viewer
-from images_framework.src.utils import load_geoimage
-from images_framework.regression.alignment.landmarks import lps
+from pcr_framework.src.constants import Modes
+from pcr_framework.src.datasets import Database
+from pcr_framework.src.composite import Composite
+from pcr_framework.src.annotations import GenericVideo, GenericImage, PersonObject, GenericLandmark, GenericCategory
+from pcr_framework.src.viewer import Viewer
+from pcr_framework.src.utils import load_geoimage
+from pcr_framework.regression.alignment.landmarks import lps
 from src.cvprw26_recognition import CVPRW26Recognition
 
 image_extensions = ('bmp', 'jpg', 'jpeg', 'png', 'tif', 'tiff')
@@ -78,7 +78,7 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
             obj.add_category(GenericCategory(categories[int(attributes['emotion'])]))
             img_ann.add_object(obj)
     else:
-        from images_framework.detection.ssd16_detection.src.ssd16_detection import SSD16Detection
+        from pcr_framework.detection.ssd16_detection.src.ssd16_detection import SSD16Detection
         sd = SSD16Detection('images_framework/detection/ssd16_detection/')
         sd.parse_options(['--database', 'coco'])
         sd.load(Modes.TEST)
