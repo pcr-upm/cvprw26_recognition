@@ -53,7 +53,7 @@ def load_annotations(anns_file):
     Load ground truth annotations according to each database.
     """
     from PIL import Image
-    from pcr_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
+    from pcr_framework.src.annotations import GenericVideo, GenericImage, PersonObject, GenericCategory
     from pcr_framework.categories.emotions import Emotion as Oe
     from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2, parse_multipie
     print('Open annotations file: ' + str(anns_file))
@@ -85,7 +85,7 @@ def load_annotations(anns_file):
         raise ValueError('Annotations file does not exist')
     anns = []
     for sample in tqdm(samples, file=sys.stdout):
-        seq = GenericGroup()
+        seq = GenericVideo()
         image = GenericImage(dbpath + sample['path'])
         width, height = Image.open(image.filename).size
         image.tile = np.array([0, 0, width, height])

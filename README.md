@@ -22,7 +22,7 @@ usage: cvprw26_recognition_test.py [-h] [--input-data INPUT_DATA] [--show-viewer
 
 * Use the --save-image option to save the processed images.
 ```
-usage: Alignment --database DATABASE
+usage: Recognition --database DATABASE
 ```
 
 * Use the --database option to select the database model.
