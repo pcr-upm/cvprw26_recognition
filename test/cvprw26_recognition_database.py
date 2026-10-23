@@ -5,7 +5,7 @@ __email__ = 'roberto.valle@upm.es'
 
 import os
 import sys
-sys.path.append(os.getcwd())
+sys.path.insert(0, os.getcwd())
 import copy
 import numpy as np
 import pandas as pd
@@ -54,32 +54,31 @@ def load_annotations(anns_file):
     """
     from PIL import Image
     from pcr_framework.src.annotations import GenericGroup, GenericImage, PersonObject, GenericCategory
-    from pcr_framework.src.categories import Name
     from pcr_framework.categories.emotions import Emotion as Oe
     from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2, parse_multipie
     print('Open annotations file: ' + str(anns_file))
     if os.path.isfile(anns_file) and anns_file in ['csv/rafdb_test_pose_bboxq_illum.csv']:
         dbpath = '/media/bobetocalo/database/classification/faces/expressions/raf/basic/'
-        gender = {0: Name('Male'), 1: Name('Female')}
-        race = {0: Name('Caucasian'), 1: Name('African-American'), 2: Name('Asian')}
+        gender = {0: 'Male', 1: 'Female'}
+        race = {0: 'Caucasian', 1: 'African-American', 2: 'Asian'}
         categories = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
         samples = parse_rafdb(Path(anns_file))
     elif os.path.isfile(anns_file) and anns_file in ['csv/affectnetplus_test_annotations_quality_illum.csv']:
         dbpath = '/media/bobetocalo/database/classification/faces/expressions/affectnet/'
-        gender = {0: Name('Female'), 1: Name('Male')}
-        race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White'), 4: Name('Middle-Eastern'), 5: Name('Latino-Hispanic')}
+        gender = {0: 'Female', 1: 'Male'}
+        race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White', 4: 'Middle-Eastern', 5: 'Latino-Hispanic'}
         categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
         samples = parse_affectnet(Path(anns_file))
     elif os.path.isfile(anns_file) and anns_file in ['csv/dataframe_val_pose_demographic_illum.csv']:
         dbpath = '/media/bobetocalo/database/classification/faces/expressions/affwild2/'
-        gender = {0: Name('Female'), 1: Name('Male')}
-        race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White')}
+        gender = {0: 'Female', 1: 'Male'}
+        race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White'}
         categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
         samples = parse_affwild2(Path(anns_file))
     elif os.path.isfile(anns_file) and anns_file in ['csv/test_expr_gender_pose_balanced.csv', 'csv/balanced_subset.csv', 'csv/biased_subset.csv']:
         dbpath = '/media/bobetocalo/database/classification/faces/expressions/MultiPie/'
-        gender = {0: Name('Female'), 1: Name('Male')}
-        race = {0: Name('Asian'), 1: Name('Indian'), 2: Name('Black'), 3: Name('White')}
+        gender = {0: 'Female', 1: 'Male'}
+        race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White'}
         categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SURPRISE, 3: Oe.FACE.OTHER, 4: Oe.FACE.DISGUST, 5: Oe.FACE.FEAR}
         samples = parse_multipie(Path(anns_file))
     else:
@@ -94,12 +93,12 @@ def load_annotations(anns_file):
         obj.headpose = Rotation.from_euler('YXZ', [-float(sample['yaw']*90), 0, 0], degrees=True).as_matrix()
         obj.add_attribute(GenericCategory(label=gender[int(sample['gender'])]))
         obj.add_attribute(GenericCategory(label=race[int(sample['race'])]))
-        obj.add_attribute(GenericCategory(label=Name('illumination'), score=float(sample['illumination'])))
+        obj.add_attribute(GenericCategory(label='illumination', label_confidence=float(sample['illumination'])))
         obj.add_category(GenericCategory(categories[int(sample['expression'])]))
         image.add_object(obj)
         seq.add_image(image)
         anns.append(seq)
-    return anns, [cat.name for cat in categories.values()]
+    return anns, [cat for cat in categories.values()]
 
 
 def expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor):
@@ -183,7 +182,7 @@ def main():
     anns, categories = load_annotations(anns_file)
     # Analyze annotation data
     print("\n=== Expression counts within each demomographic-confounding factor bin ===")
-    records = [{'Pose': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].score} for seq in anns for img in seq.images for obj in img.objects]
+    records = [{'Pose': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].label.confidence} for seq in anns for img in seq.images for obj in img.objects]
     df = pd.DataFrame.from_records(records)
     df = expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
     # Load computer vision components

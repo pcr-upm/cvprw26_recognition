@@ -5,7 +5,7 @@ __email__ = 'roberto.valle@upm.es'
 
 import os
 import sys
-sys.path.append(os.getcwd())
+sys.path.insert(0, os.getcwd())
 import cv2
 import json
 import copy
@@ -77,12 +77,6 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
             obj.add_attribute(GenericCategory(age[int(attributes['age'])]))
             obj.add_category(GenericCategory(categories[int(attributes['emotion'])]))
             img_ann.add_object(obj)
-    else:
-        from pcr_framework.detection.ssd16_detection.src.ssd16_detection import SSD16Detection
-        sd = SSD16Detection('pcr_framework/detection/ssd16_detection/')
-        sd.parse_options(['--database', 'coco'])
-        sd.load(Modes.TEST)
-        sd.process(ann, pred)
     ann.add_image(img_ann)
     pred.add_image(copy.deepcopy(img_ann))
     for img_pred in pred.images:
@@ -111,7 +105,6 @@ def main():
     """
     Facial expression recognition test script.
     """
-    print('OpenCV ' + cv2.__version__)
     unknown, input_data, show_viewer, save_image = parse_options()
 
     # Determine if we get the images from a camera, video or directory
