@@ -25,8 +25,8 @@ def parse_options():
     """
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument('--anns-file', '-a', dest='anns_file', required=True,
-                        help='Ground truth annotations file.')
+    parser.add_argument('--db-path', '-d', dest='db_path', required=True,
+                        help='Ground truth annotations path.')
     parser.add_argument('--show-viewer', '-v', dest='show_viewer', action="store_true",
                         help='Show results visually.')
     parser.add_argument('--save-file', '-f', dest='save_file', action="store_true",
@@ -39,61 +39,59 @@ def parse_options():
                         help='Confounding factor.')
     args, unknown = parser.parse_known_args()
     print(parser.format_usage())
-    anns_file = args.anns_file
+    db_path = args.db_path
     show_viewer = args.show_viewer
     save_file = args.save_file
     save_image = args.save_image
     demo_factor = args.demographic_factor
     conf_factor = args.confounding_factor
-    return unknown, anns_file, show_viewer, save_file, save_image, demo_factor, conf_factor
+    return unknown, db_path, show_viewer, save_file, save_image, demo_factor, conf_factor
 
 
-def load_annotations(anns_file):
+def load_annotations(db_path, database):
     """
     Load ground truth annotations according to each database.
     """
     from PIL import Image
+    from pcr_framework.src.datasets import Database
     from pcr_framework.src.annotations import GenericVideo, GenericImage, PersonObject, GenericCategory
     from pcr_framework.categories.emotions import Emotion as Oe
     from src.load_csv import parse_rafdb, parse_affectnet, parse_affwild2, parse_multipie
-    print('Open annotations file: ' + str(anns_file))
-    if os.path.isfile(anns_file) and anns_file in ['csv/rafdb_test_pose_bboxq_illum.csv']:
-        dbpath = '/media/bobetocalo/database/classification/faces/expressions/raf/basic/'
+    datasets = [subclass().get_names() for subclass in Database.__subclasses__()]
+    idx = next((idx for idx, subset in enumerate(datasets) if database in subset), None)
+    if idx is None:
+        raise ValueError(f'Database is not implemented: {database}')
+    db = Database.__subclasses__()[idx]()
+    categories = db.get_categories()
+    if 'raf' in db.get_names():
         gender = {0: 'Male', 1: 'Female'}
         race = {0: 'Caucasian', 1: 'African-American', 2: 'Asian'}
-        categories = {0: Oe.FACE.SURPRISE, 1: Oe.FACE.FEAR, 2: Oe.FACE.DISGUST, 3: Oe.FACE.HAPPINESS, 4: Oe.FACE.SADNESS, 5: Oe.FACE.ANGER, 6: Oe.FACE.NEUTRAL}
-        samples = parse_rafdb(Path(anns_file))
-    elif os.path.isfile(anns_file) and anns_file in ['csv/affectnetplus_test_annotations_quality_illum.csv']:
-        dbpath = '/media/bobetocalo/database/classification/faces/expressions/affectnet/'
+        samples = parse_rafdb(Path('csv/rafdb_test_pose_bboxq_illum.csv'))
+    elif 'affectnet' in db.get_names():
         gender = {0: 'Female', 1: 'Male'}
         race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White', 4: 'Middle-Eastern', 5: 'Latino-Hispanic'}
-        categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SADNESS, 3: Oe.FACE.SURPRISE, 4: Oe.FACE.FEAR, 5: Oe.FACE.DISGUST, 6: Oe.FACE.ANGER, 7: Oe.FACE.CONTEMPT}
-        samples = parse_affectnet(Path(anns_file))
-    elif os.path.isfile(anns_file) and anns_file in ['csv/dataframe_val_pose_demographic_illum.csv']:
-        dbpath = '/media/bobetocalo/database/classification/faces/expressions/affwild2/'
+        samples = parse_affectnet(Path('csv/affectnetplus_test_annotations_quality_illum.csv'))
+    elif 'affwild2' in db.get_names():
         gender = {0: 'Female', 1: 'Male'}
         race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White'}
-        categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.ANGER, 2: Oe.FACE.DISGUST, 3: Oe.FACE.FEAR, 4: Oe.FACE.HAPPINESS, 5: Oe.FACE.SADNESS, 6: Oe.FACE.SURPRISE, 7: Oe.FACE.CONTEMPT}
-        samples = parse_affwild2(Path(anns_file))
-    elif os.path.isfile(anns_file) and anns_file in ['csv/test_expr_gender_pose_balanced.csv', 'csv/balanced_subset.csv', 'csv/biased_subset.csv']:
-        dbpath = '/media/bobetocalo/database/classification/faces/expressions/MultiPie/'
+        samples = parse_affwild2(Path('csv/dataframe_val_pose_demographic_illum.csv'))
+    elif 'multipie' in db.get_names():
         gender = {0: 'Female', 1: 'Male'}
         race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White'}
-        categories = {0: Oe.FACE.NEUTRAL, 1: Oe.FACE.HAPPINESS, 2: Oe.FACE.SURPRISE, 3: Oe.FACE.OTHER, 4: Oe.FACE.DISGUST, 5: Oe.FACE.FEAR}
-        samples = parse_multipie(Path(anns_file))
-    else:
-        raise ValueError('Annotations file does not exist')
+        samples = parse_multipie(Path('csv/test_expr_gender_pose_balanced.csv'))
+        # samples = parse_multipie(Path('csv/balanced_subset.csv'))
+        # samples = parse_multipie(Path('csv/biased_subset.csv'))
     anns = []
     for sample in tqdm(samples, file=sys.stdout):
         seq = GenericVideo()
-        image = GenericImage(dbpath + sample['path'])
+        image = GenericImage(db_path + sample['path'])
         width, height = Image.open(image.filename).size
         image.tile = np.array([0, 0, width, height])
         obj = PersonObject()
         obj.headpose = Rotation.from_euler('YXZ', [-float(sample['yaw']*90), 0, 0], degrees=True).as_matrix()
-        obj.add_attribute(GenericCategory(label=gender[int(sample['gender'])]))
-        obj.add_attribute(GenericCategory(label=race[int(sample['race'])]))
-        obj.add_attribute(GenericCategory(label='illumination', label_confidence=float(sample['illumination'])))
+        obj.add_category(GenericCategory(gender[int(sample['gender'])]))
+        obj.add_category(GenericCategory(race[int(sample['race'])]))
+        obj.add_category(GenericCategory(str(float(sample['illumination']))))
         obj.add_category(GenericCategory(categories[int(sample['expression'])]))
         image.add_object(obj)
         seq.add_image(image)
@@ -178,13 +176,7 @@ def main():
     """
     Facial expression recognition database script.
     """
-    unknown, anns_file, show_viewer, save_file, save_image, demo_factor, conf_factor = parse_options()
-    anns, categories = load_annotations(anns_file)
-    # Analyze annotation data
-    print("\n=== Expression counts within each demomographic-confounding factor bin ===")
-    records = [{'Pose': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[0].label.name, 'Gender': obj.attributes[0].label.name, 'Race': obj.attributes[1].label.name, 'Illumination': obj.attributes[2].label.confidence} for seq in anns for img in seq.images for obj in img.objects]
-    df = pd.DataFrame.from_records(records)
-    df = expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
+    unknown, db_path, show_viewer, save_file, save_image, demo_factor, conf_factor = parse_options()
     # Load computer vision components
     composite = Composite()
     sr = CVPRW26Recognition('')
@@ -193,6 +185,12 @@ def main():
     composite.load(Modes.TEST)
     spec = importlib.util.find_spec('pcr_framework')
     output_path = os.path.join('pcr_framework' if spec is None else os.path.dirname(spec.origin), 'output')
+    # Analyze annotation data
+    anns, categories = load_annotations(db_path, sr.database)
+    print("\n=== Expression counts within each demomographic-confounding factor bin ===")
+    records = [{'Pose': Rotation.from_matrix(obj.headpose).as_euler('YXZ', degrees=True)[0], 'EmotionGt': obj.categories[3].label.name, 'Gender': obj.categories[0].label.name, 'Race': obj.categories[1].label.name, 'Illumination': float(obj.categories[2].label.name)} for ann in anns for img in ann.images for obj in img.objects]
+    df = pd.DataFrame.from_records(records)
+    df = expression_counts_by_demo_and_conf(df, categories, demo_factor, conf_factor)
     if show_viewer:
         viewer = Viewer('cvprw26_recognition_database')
     if save_file:

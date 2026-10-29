@@ -59,9 +59,6 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
     if os.path.exists(ifs):
         db = Database.__subclasses__()[next((idx for idx, subset in enumerate(datasets) if json.load(open(ifs))['database'] in subset), None)]()
         landmarks = db.get_landmarks()
-        gender = db._gender
-        race = db._race
-        age = db._age
         categories = db.get_categories()
         for line in json.load(open(ifs))['annotations']:
             obj = PersonObject()
@@ -72,9 +69,9 @@ def process_frame(composite, filename, show_viewer, save_image, viewer, delay, d
                 lp = next((elem for part in lps.keys() for elem in part if elem.value == name), None)
                 obj.add_landmark(GenericLandmark(lnd['label'], lp, lnd['pos'], lnd['visible'], lnd['confidence']), lps[type(lp)])
             attributes = line['attributes']
-            obj.add_attribute(GenericCategory(gender[int(attributes['gender'])]))
-            obj.add_attribute(GenericCategory(race[int(attributes['race'])]))
-            obj.add_attribute(GenericCategory(age[int(attributes['age'])]))
+            obj.add_category(GenericCategory(attributes['gender']))
+            obj.add_category(GenericCategory(attributes['race']))
+            obj.add_category(GenericCategory(attributes['age']))
             obj.add_category(GenericCategory(categories[int(attributes['emotion'])]))
             img_ann.add_object(obj)
     ann.add_image(img_ann)

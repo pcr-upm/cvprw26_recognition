@@ -9,7 +9,7 @@ IEEE Conference on Computer Vision and Pattern Recognition Workshops, CVPRW 2026
 ```
 
 #### Requisites
-The required dependencies are installed in the [`Dockerfile`](./Dockerfile#L33-L34).
+The required dependencies are installed in the [`Dockerfile`](./Dockerfile#L32-L33).
 
 #### Usage
 ```
@@ -36,7 +36,7 @@ usage: CVPRW26Recognition [--gpu GPU] [--batch-size BATCH_SIZE] [--epochs EPOCHS
 ```
 
 ```
-> python test/cvprw26_recognition_database.py --anns-file csv/affectnetplus_test_annotations_quality_illum.csv --database affectnet --gpu 0 --demographic-factor Gender --confounding-factor Illumination
+> python test/cvprw26_recognition_database.py --db-path database/classification/faces/expressions/affectnet/ --database affectnet --gpu 0 --demographic-factor Gender --confounding-factor Illumination
 ```
 
 ```
@@ -60,6 +60,19 @@ mPrecision: 61.529%
 > Neutral: Recall: 77.154% Precision: 33.891% Specificity: 78.543% Dice: 47.095%
 > Sadness: Recall: 51.200% Precision: 60.377% Specificity: 95.199% Dice: 55.411%
 > Surprise: Recall: 41.800% Precision: 57.735% Specificity: 95.627% Dice: 48.492%
+
+=== Expression counts within each demomographic-confounding factor bin ===
+DemoBin   Female          Male        
+ConfBin    0_125 125_255 0_125 125_255
+EmotionGt                             
+Neutral       16     133   106     244
+Happiness     25     196    80     199
+Sadness       37      84   155     224
+Surprise      38     119   101     242
+Fear          48      81   151     220
+Disgust       17      77   127     279
+Anger         10      45   156     289
+Contempt      18     110    91     281
 
 === Macro-TPR (%) per demographic factor using a visual confounder ===
 conf    0_125  125_255   All
