@@ -63,6 +63,7 @@ def load_annotations(db_path, database):
         raise ValueError(f'Database is not implemented: {database}')
     db = Database.__subclasses__()[idx]()
     categories = db.get_categories()
+    categories = {i: v for i, v in enumerate(categories.values())}
     if 'raf' in db.get_names():
         gender = {0: 'Male', 1: 'Female'}
         race = {0: 'Caucasian', 1: 'African-American', 2: 'Asian'}
@@ -78,9 +79,9 @@ def load_annotations(db_path, database):
     elif 'multipie' in db.get_names():
         gender = {0: 'Female', 1: 'Male'}
         race = {0: 'Asian', 1: 'Indian', 2: 'Black', 3: 'White'}
-        samples = parse_multipie(Path('csv/test_expr_gender_pose_balanced.csv'))
+        # samples = parse_multipie(Path('csv/test_expr_gender_pose_balanced.csv'))
         # samples = parse_multipie(Path('csv/balanced_subset.csv'))
-        # samples = parse_multipie(Path('csv/biased_subset.csv'))
+        samples = parse_multipie(Path('csv/biased_subset.csv'))
     anns = []
     for sample in tqdm(samples, file=sys.stdout):
         seq = GenericVideo()
